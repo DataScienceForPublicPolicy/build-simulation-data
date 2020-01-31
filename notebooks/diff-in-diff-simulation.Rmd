@@ -1,0 +1,144 @@
+---
+title: "Difference-in-Differences"
+output: html_notebook
+---
+
+This notebook constructs the underlying simulated data for Chapter 8's discussion on Difference-in-Differences (DID). To sample construction is quite complex, yielding a data set of $N=2000$ records with $n=100$ observations in each of $T=20$ time periods. 
+
+```{r}
+
+#Load Packages
+  #install.packages('pacman')
+  pacman::p_load(tidyverse,ggplot2,reshape)
+
+#Set some information for up for data generation
+  Nc  <- 50 #Number of control units
+  Nt  <- 50 #Number of treated units
+  K   <- 5  #Number of explanatory variables
+  Ti  <- 20 #length of time
+  tt  <- seq(1,Ti,1) #Just a sequence of time periods from 1-T
+  tau <- Ti/2 #Indicates when the treatment is applied
+  nu  <- tau + 1 #How many periods does the treatment influence the trend of the treated series?
+  
+#Set up parameters for DGP
+  alpha.treatment   <- 25       #This is alpha for the treated group
+  alpha.control <- 10           #Here is alpha for the untreated group
+  beta          <- rep(1,K)     #The parameters for the co-variates.
+  lambda        <- 2
+  gamma         <- 5
+  phi           <- 0
+  sigma         <- 1
+  
+#Set up storage vectors
+  covariates.treatment   <- rep(0,Nt*K*Ti); dim(covariates.treatment) <- c(Nt,K,Ti)
+  covariates.control     <- rep(0,Nc*K*Ti); dim(covariates.control) <- c(Nc,K,Ti)
+  outcome.treatment      <- rep(0,Nt*Ti); dim(outcome.treatment) <- c(Nt,Ti)
+  outcome.control        <- rep(0,Nc*Ti); dim(outcome.control)  <- c(Nc,Ti)
+  outcome.counterfactual <- rep(0,Nt*Ti); dim(outcome.counterfactual) <- c(Nt,Ti)
+  
+for (t in 1:Ti) {
+  
+  covariates.control[,,t]   <- rnorm(Nc,K)
+  covariates.treatment[,,t] <- rnorm(Nt,K)
+  
+  if (t == 1) {
+    
+    epsilon.treatment   <- rnorm(Nt)
+    epsilon.control <- rnorm(Nc)
+    
+    outcome.control[,t] <- alpha.control + (tt[t]*lambda)*rep(1,Nc) + 
+      covariates.control[,,t]%*%beta + sigma*epsilon.control
+    
+    outcome.treatment[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      covariates.treatment[,,t]%*%beta + sigma*epsilon.treatment
+    
+    outcome.counterfactual[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      covariates.treatment[,,t]%*%beta + sigma*epsilon.treatment
+    
+    
+  } else if (t > 1 && t <= tau) {
+    
+    
+    epsilon.treatment   <- rnorm(Nt)
+    epsilon.control <- rnorm(Nc)
+    
+    outcome.control[,t] <- alpha.control + (tt[t]*lambda)*rep(1,Nc) + 
+      phi*outcome.control[,t-1] + covariates.control[,,t]%*%beta + 
+      sigma*epsilon.control
+    
+    outcome.treatment[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      phi*outcome.treatment[,t-1] + covariates.treatment[,,t]%*%beta +
+      sigma*epsilon.treatment
+    
+    outcome.counterfactual[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      phi*outcome.treatment[,t-1] + covariates.treatment[,,t]%*%beta +
+      sigma*epsilon.treatment
+    
+  } else if (t > tau && t <= nu) {
+    
+    epsilon.treatment   <- rnorm(Nt)
+    epsilon.control <- rnorm(Nc)
+    
+    outcome.control[,t] <- alpha.control + (tt[t]*lambda)*rep(1,Nc) + 
+      phi*outcome.control[,t-1] + covariates.control[,,t]%*%beta + 
+      sigma*epsilon.control
+    
+    outcome.treatment[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      (tt[(t - (tau - 1))]*gamma)*rep(1,Nt) + phi*outcome.treatment[,t-1] +
+      covariates.treatment[,,t]%*%beta + sigma*epsilon.treatment
+    
+    outcome.counterfactual[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      phi*outcome.treatment[,t-1] + covariates.treatment[,,t]%*%beta +
+      sigma*epsilon.treatment
+    
+  } else if (t > nu) {
+    
+    epsilon.treatment   <- rnorm(Nt)
+    epsilon.control <- rnorm(Nc)
+    
+    outcome.control[,t] <- alpha.control + (tt[t]*lambda)*rep(1,Nc) + 
+      phi*outcome.control[,t-1] + covariates.control[,,t]%*%beta + 
+      sigma*epsilon.control
+    
+    outcome.treatment[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      (tt[(Ti - (Ti - (nu - tau + 1)))]*gamma)*rep(1,Nt) + phi*outcome.treatment[,t-1] +
+      covariates.treatment[,,t]%*%beta + sigma*epsilon.treatment
+    
+    outcome.counterfactual[,t] <- alpha.treatment + (tt[t]*lambda)*rep(1,Nt) + 
+      phi*outcome.treatment[,t-1] + covariates.treatment[,,t]%*%beta +
+      sigma*epsilon.treatment
+    
+  }
+}
+  
+#Now we are going to stack our arrays so that we can use the data
+    did_data <- data.frame(cbind(time = rep(1,Nt+Nc),
+                                 treatment  = c(rep(0,Nc),rep(1,Nt)),
+                                 ob.outcome = c(outcome.control[,1],
+                                                    outcome.treatment[,1]),
+                                 cf.outcome = c(outcome.control[,1],
+                                                    outcome.counterfactual[,1]),
+                                 ob_covaria = rbind(covariates.control[,,1],
+                                                    covariates.treatment[,,1])))
+    
+  for (i in 2:Ti) {
+    temp <- data.frame(cbind(time = rep(i,Nt+Nc),
+                                 treatment  = c(rep(0,Nc),rep(1,Nt)),
+                                 ob.outcome = c(outcome.control[,i],
+                                                    outcome.treatment[,i]),
+                                 cf.outcome = c(outcome.control[,i],
+                                                    outcome.counterfactual[,i]),
+                                 ob_covaria = rbind(covariates.control[,,i],
+                                                    covariates.treatment[,,i])))
+    did_data <- rbind(did_data,temp)
+    rm(temp)
+  }
+    
+#Keep only first four columns
+  did_data <- did_data[, c(1:4)]
+  colnames(did_data)[2] <- "treated"
+  did_data <- data.frame(id = rep(1:100, 20), did_data)
+  save(did_data, file = "did_data.Rda")
+```
+
+

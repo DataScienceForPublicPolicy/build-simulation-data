@@ -1,0 +1,50 @@
+---
+title: "Difference-in-Differences"
+output: html_notebook
+---
+
+This notebook constructs the underlying simulated data for Chapter 8's discussion on Regression Discontinuity (RD). 
+
+#Part 1: Create random norml distribution setting discontinuity at 0.
+
+```{r}
+#install.packages("pacman")
+  pacman::p_load(rdrobust, ggplot2)
+
+#Let's generate some data
+  set.seed(3264)
+  N <- 1e5  #Number of observations
+  Z <- rnorm(N) #Running Variable
+  Z0 <- 0            #Cut-off point
+  Q <- Z > Z0
+
+#Example data
+  example_data <- data.frame(Z = Z,
+                             Q = Q)
+
+```
+
+#Part 2: Simulate an outcome variable 
+
+$$Y = \alpha + \zeta Z + \tau Q + \varepsilon$$
+
+where $Y$ is the outcome, $Z$ is the running variable, $Q$ is the treatment indicator, and $\varepsilon$ is an identically and indepdently distributed noise parameter. The unknown object of interest is $\tau$ or the effect of changing one's treatment status on the outcome $Y$.
+
+```{r}
+#Set parameters
+  varepsilon <- rnorm(N)
+  tau <- 3
+  alpha <- 0
+  zeta <- 0.5
+  
+#Create outcome
+  Y <-  alpha + zeta*Z + tau*Q + varepsilon
+  
+#Create data set
+  simulated_rd_data <- data.frame(Y = Y,
+                                  Z = Z,
+                                  color = ifelse(Q == 1,'blue','red'))
+
+```
+
+
