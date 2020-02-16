@@ -136,9 +136,22 @@ for (t in 1:Ti) {
     
 #Keep only first four columns
   did_data <- did_data[, c(1:4)]
-  colnames(did_data)[2] <- "treated"
+  colnames(did_data)[c(2:3)] <- c("treated", "y")
+  
+#Panel ID
   did_data <- data.frame(id = rep(1:100, 20), did_data)
-  save(did_data, file = "did_data.Rda")
+
+  
+#Extract projected series
+  projected_data <- did_data[, c(1, 2, 3, 5)]
+  colnames(projected_data)[4] <- "y"
+  projected_data <- filter(projected_data, treated == 1)
+  
+#Set up master
+  did_data <- did_data[, c(1, 2, 3, 4)] 
+      
+
+  save(did_data, projected_data, file = "did_data.Rda")
 ```
 
 

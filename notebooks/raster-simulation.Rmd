@@ -1,0 +1,123 @@
+---
+title: "Simulating Rasters (Chapter 12)"
+author: "Ed Rubin"
+date: "2/15/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Part 1: Simulate the data
+
+In this simple tutorial, we simulate a raster data set containing $50 \times 50$ cells. 
+
+```{r}
+# Number of rows
+  nx = 50
+  ny = 50
+
+# Set seed for reproducibility
+  set.seed(123)
+```
+
+Next, we simulate random normal distributions and create three rasters.
+```{r}
+#Load
+  pacman::p_load(raster, data.table, magrittr)
+
+#Generate data
+#Create combination of all x and y values
+# Create a random normal distribution
+  r1 = expand.grid(
+    x = 1:nx,
+    y = 1:ny
+  ) %T>%
+  setDT() %>%
+  .[,val := rnorm(n = nx*ny, mean = x + y, sd = sqrt(ny))] %>%
+  rasterFromXYZ()
+  
+  r2 = expand.grid(
+    x = 1:nx,
+    y = 1:ny
+  ) %T>%
+  setDT() %>%
+  .[,val := rnorm(n = nx*ny, mean = (-0.5) * x + 2 * y, sd = sqrt(ny))] %>%
+  rasterFromXYZ()
+  
+  r3 = expand.grid(
+    x = 1:nx,
+    y = 1:ny
+  ) %T>%
+  setDT() %>%
+  .[,val := rnorm(n = nx*ny, mean = (1) * x - 1.25 * y, sd = sqrt(ny))] %>%
+  rasterFromXYZ()
+  
+```
+
+Also, construct a data frame with simulated population.
+
+```{r}
+  pop_r = expand.grid(
+    x = 1:nx,
+    y = 1:ny
+  ) %T>%
+  setDT() %>%
+  .[,val := runif(n = nx*ny, min = 1, max = 100)] %>%
+  rasterFromXYZ()
+```
+
+For each, we standardize the values.
+```{r}
+# Force to same range: 1 to 100
+  r1 = r1 - cellStats(r1, min) + 1
+  r1 = 100 * r1 / cellStats(r1, max)
+  r2 = r2 - cellStats(r2, min) + 1
+  r2 = 100 * r2 / cellStats(r2, max)
+  r3 = r3 - cellStats(r3, min) + 1
+  r3 = 100 * r3 / cellStats(r3, max)
+```
+
+Save out the data as a `Rda`.
+```{r}
+save(r1, r2, r3, pop_r, file = "raster_simulate.Rda")
+```
+
+##Part 2: Raster Math and Visuals
+
+To check if the data is in good shape, we plot each raster.
+
+```{r}
+#Load graphing packages
+  pacman::p_load(ggplot2, gridExtra, cowplot)
+
+#Create the plots
+  p1 = ggplot(data = as.data.frame(r1, xy = T)) +
+    geom_raster(aes(x, y, fill = val)) +
+    scale_fill_viridis_c("", option = "magma") +
+    guides(fill = guide_colourbar(barwidth = 1, barheight = 15)) +
+    coord_equal() +
+    theme_void() +
+    ggtitle("r1") + 
+    theme(legend.position = "none", plot.title =  element_text(size=10, hjust = 0.5))
+  
+  p2 = ggplot(data = as.data.frame(r2, xy = T)) +
+    geom_raster(aes(x, y, fill = val)) +
+    scale_fill_viridis_c("", option = "magma") +
+    guides(fill = guide_colourbar(barwidth = 1, barheight = 15)) +
+    coord_equal() +
+    theme_void() +
+    ggtitle("r2") + 
+  theme(legend.position = "none", plot.title =  element_text(size=10, hjust = 0.5))
+  
+  p3 = ggplot(data = as.data.frame(r3, xy = T)) +
+    geom_raster(aes(x, y, fill = val)) +
+    scale_fill_viridis_c("", option = "magma") +
+    guides(fill = guide_colourbar(barwidth = 1, barheight = 15)) +
+    coord_equal() +
+    theme_void() + 
+    ggtitle("r3") 
+  plegend = p3 %>% get_legend()
+  p3 = p3 + theme(legend.position = "none", plot.title =  element_text(size=10, hjust = 0.5))
+  
+  grid.arrange(p1, p2, p3, ncol = 3)
+```
